@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'event_details_screen.dart';
+import 'my_tickets_screen.dart';
 
 class CustomerDashboard extends StatelessWidget {
   const CustomerDashboard({super.key});
@@ -10,7 +11,6 @@ class CustomerDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -31,7 +31,6 @@ class CustomerDashboard extends StatelessWidget {
           ),
         ],
       ),
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -45,9 +44,7 @@ class CustomerDashboard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               const Text(
                 'Find events and book your tickets easily.',
                 style: TextStyle(
@@ -55,9 +52,7 @@ class CustomerDashboard extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
-
               const SizedBox(height: 25),
-
               TextField(
                 decoration: InputDecoration(
                   hintText: 'Search events...',
@@ -67,9 +62,7 @@ class CustomerDashboard extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 25),
-
               const Text(
                 'Available Events',
                 style: TextStyle(
@@ -77,16 +70,13 @@ class CustomerDashboard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 15),
-
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('events')
                       .where('status', isEqualTo: 'published')
                       .snapshots(),
-
                   builder: (context, snapshot) {
                     if (snapshot.connectionState ==
                         ConnectionState.waiting) {
@@ -134,17 +124,40 @@ class CustomerDashboard extends StatelessWidget {
 
                     return ListView.builder(
                       itemCount: events.length,
-
                       itemBuilder: (context, index) {
-                        final event = events[index].data()
+                        final eventData = events[index].data()
                         as Map<String, dynamic>;
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 15),
-                          elevation: 2,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(15),
+                        // Include the unique Firestore document ID.
+                        final event = {
+                          ...eventData,
+                          'id': events[index].id,
+                        };
 
+                        final imageUrl =
+                        event['imageUrl'] as String?;
+
+                        final price = event['price'] ?? 0;
+                        final eventDate = event['date'];
+
+                        String formattedDate =
+                            'Date not specified';
+
+                        if (eventDate is Timestamp) {
+                          final date = eventDate.toDate();
+                          formattedDate =
+                          '${date.day}/${date.month}/${date.year}';
+                        }
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          elevation: 3,
+                          color: Colors.white,
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: InkWell(
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -156,29 +169,127 @@ class CustomerDashboard extends StatelessWidget {
                                 ),
                               );
                             },
-
-                            leading: const CircleAvatar(
-                              backgroundColor: Color(0xFFFFE8D6),
-                              child: Icon(
-                                Icons.event,
-                                color: Colors.deepOrange,
-                              ),
-                            ),
-
-                            title: Text(
-                              event['title'] ?? 'Untitled Event',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-
-                            subtitle: Text(
-                              event['venue'] ?? 'Venue not specified',
-                            ),
-
-                            trailing: const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 190,
+                                  child: imageUrl != null &&
+                                      imageUrl.isNotEmpty
+                                      ? Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey.shade200,
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          size: 50,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    },
+                                  )
+                                      : Container(
+                                    color: const Color(0xFFFFE8D6),
+                                    child: const Icon(
+                                      Icons.event,
+                                      size: 60,
+                                      color: Colors.deepOrange,
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(15),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        event['title'] ??
+                                            'Untitled Event',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on_outlined,
+                                            size: 18,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Expanded(
+                                            child: Text(
+                                              event['venue'] ??
+                                                  'Venue not specified',
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_today_outlined,
+                                            size: 17,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            formattedDate,
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'FCFA $price',
+                                            style: const TextStyle(
+                                              color: Colors.deepOrange,
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const Row(
+                                            children: [
+                                              Text(
+                                                'View Event',
+                                                style: TextStyle(
+                                                  color: Colors.deepOrange,
+                                                  fontWeight:
+                                                  FontWeight.w600,
+                                                ),
+                                              ),
+                                              SizedBox(width: 5),
+                                              Icon(
+                                                Icons.arrow_forward,
+                                                color: Colors.deepOrange,
+                                                size: 18,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -191,8 +302,17 @@ class CustomerDashboard extends StatelessWidget {
           ),
         ),
       ),
-
       bottomNavigationBar: BottomNavigationBar(
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MyTicketsScreen(),
+              ),
+            );
+          }
+        },
         selectedItemColor: Colors.deepOrange,
         unselectedItemColor: Colors.grey,
         currentIndex: 0,

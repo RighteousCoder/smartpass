@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Smart Pass backend secrets
+/backend/serviceAccountKey.json
+/backend/.env
+/backend/node_modules/

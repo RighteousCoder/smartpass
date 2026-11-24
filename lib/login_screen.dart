@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool hidePassword = true;
   bool isLoading = false;
+  bool isResettingPassword = false;
 
   Future<void> login() async {
     if (emailController.text.trim().isEmpty ||
@@ -37,7 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Sign in with Firebase Authentication
       UserCredential userCredential =
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
@@ -46,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       String userId = userCredential.user!.uid;
 
-      // Get the user's profile from Firestore
       DocumentSnapshot userDocument = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -61,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Navigate according to the user's role
       if (role == 'customer') {
         Navigator.pushReplacement(
           context,
@@ -127,6 +125,69 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Send password reset email
+  Future<void> resetPassword() async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email address first.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isResettingPassword = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: email,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password reset link sent. Please check your email.',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Could not send reset email. Please try again.';
+
+      if (e.code == 'invalid-email') {
+        message = 'Please enter a valid email address.';
+      } else if (e.code == 'user-not-found') {
+        message = 'No account found with this email.';
+      } else if (e.code == 'too-many-requests') {
+        message = 'Too many attempts. Please try again later.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Something went wrong: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isResettingPassword = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -138,7 +199,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -152,11 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-
           child: ConstrainedBox(
             constraints: BoxConstraints(
               minHeight: MediaQuery.of(context).size.height -
@@ -164,7 +222,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   kToolbarHeight -
                   48,
             ),
-
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -192,9 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const Text(
                   'Email Address',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
 
                 const SizedBox(height: 8),
@@ -215,9 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const Text(
                   'Password',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
 
                 const SizedBox(height: 8),
@@ -251,10 +304,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
+                    onPressed:
+                    isResettingPassword ? null : resetPassword,
+                    child: Text(
+                      isResettingPassword
+                          ? 'Sending reset link...'
+                          : 'Forgot Password?',
+                      style: const TextStyle(
                         color: Color(0xFFF28C28),
                       ),
                     ),
