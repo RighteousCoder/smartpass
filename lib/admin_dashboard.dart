@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'admin_profile_screen.dart';
+
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
@@ -15,9 +17,9 @@ class AdminDashboard extends StatelessWidget {
       await FirebaseFirestore.instance
           .collection('events')
           .doc(eventId)
-          .update({
-        'status': status,
-      });
+          .update({'status': status});
+
+      if (!context.mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -29,10 +31,70 @@ class AdminDashboard extends StatelessWidget {
         ),
       );
     } catch (e) {
+      if (!context.mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Action failed: $e'),
+        SnackBar(content: Text('Action failed: $e')),
+      );
+    }
+  }
+
+  Future<void> deleteEvent(
+      BuildContext context,
+      String eventId,
+      String eventTitle,
+      ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Event?'),
+          content: Text(
+            'Are you sure you want to delete "$eventTitle"? '
+                'This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('events')
+          .doc(eventId)
+          .delete();
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event deleted successfully!'),
         ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete event: $e')),
       );
     }
   }
@@ -53,7 +115,27 @@ class AdminDashboard extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+
         actions: [
+          // Admin Profile
+          IconButton(
+            icon: const Icon(
+              Icons.account_circle_outlined,
+              color: Color(0xFFF28C28),
+              size: 28,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                  const AdminProfileScreen(),
+                ),
+              );
+            },
+          ),
+
+          // Logout
           IconButton(
             icon: const Icon(
               Icons.logout,
@@ -61,13 +143,6 @@ class AdminDashboard extends StatelessWidget {
             ),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-
-              if (context.mounted) {
-                Navigator.popUntil(
-                  context,
-                      (route) => route.isFirst,
-                );
-              }
             },
           ),
         ],
@@ -75,7 +150,6 @@ class AdminDashboard extends StatelessWidget {
 
       body: Padding(
         padding: const EdgeInsets.all(20),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -100,7 +174,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 25),
 
             const Text(
-              'Pending Events',
+              'Manage Events',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -110,18 +184,16 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 15),
 
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
+              child: StreamBuilder<
+                  QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('events')
-                    .where('status', isEqualTo: 'pending')
                     .snapshots(),
 
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const Center(
-                      child: Text(
-                        'Unable to load events.',
-                      ),
+                      child: Text('Unable to load events.'),
                     );
                   }
 
@@ -134,22 +206,22 @@ class AdminDashboard extends StatelessWidget {
                     );
                   }
 
-                  if (!snapshot.hasData ||
-                      snapshot.data!.docs.isEmpty) {
+                  final events = snapshot.data?.docs ?? [];
+
+                  if (events.isEmpty) {
                     return const Center(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment:
+                        MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.event_available,
                             size: 65,
                             color: Colors.grey,
                           ),
-
                           SizedBox(height: 15),
-
                           Text(
-                            'No pending events.',
+                            'No events available.',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey,
@@ -161,31 +233,27 @@ class AdminDashboard extends StatelessWidget {
                   }
 
                   return ListView.builder(
-                    itemCount: snapshot.data!.docs.length,
+                    itemCount: events.length,
 
                     itemBuilder: (context, index) {
-                      final event =
-                      snapshot.data!.docs[index];
+                      final event = events[index];
+                      final data = event.data();
 
                       final eventId = event.id;
-
                       final title =
-                          event['title'] ?? 'Untitled Event';
-
+                          data['title']?.toString() ??
+                              'Untitled Event';
                       final description =
-                          event['description'] ?? '';
-
+                          data['description']?.toString() ?? '';
                       final venue =
-                          event['venue'] ?? 'Venue not specified';
-
-                      final price =
-                          event['price'] ?? 0;
-
-                      final quantity =
-                          event['quantity'] ?? 0;
-
+                          data['venue']?.toString() ??
+                              'Venue not specified';
+                      final price = data['price'] ?? 0;
+                      final quantity = data['quantity'] ?? 0;
                       final organiserId =
-                          event['organiserId'] ?? '';
+                          data['organiserId']?.toString() ?? '';
+                      final status =
+                          data['status']?.toString() ?? 'unknown';
 
                       return Card(
                         margin: const EdgeInsets.only(
@@ -199,11 +267,9 @@ class AdminDashboard extends StatelessWidget {
 
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-
                           child: Column(
                             crossAxisAlignment:
                             CrossAxisAlignment.start,
-
                             children: [
                               Text(
                                 title,
@@ -220,9 +286,7 @@ class AdminDashboard extends StatelessWidget {
                               const SizedBox(height: 12),
 
                               Text('Venue: $venue'),
-
                               Text('Ticket price: $price FCFA'),
-
                               Text('Available tickets: $quantity'),
 
                               const SizedBox(height: 8),
@@ -235,56 +299,87 @@ class AdminDashboard extends StatelessWidget {
                                 ),
                               ),
 
+                              const SizedBox(height: 8),
+
+                              Text(
+                                'Status: ${status.toUpperCase()}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFF28C28),
+                                ),
+                              ),
+
                               const SizedBox(height: 18),
 
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        updateEventStatus(
-                                          context,
-                                          eventId,
-                                          'published',
-                                        );
-                                      },
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                        Colors.green,
-                                        foregroundColor:
-                                        Colors.white,
+                              if (status == 'pending')
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          updateEventStatus(
+                                            context,
+                                            eventId,
+                                            'published',
+                                          );
+                                        },
+                                        style:
+                                        ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                          Colors.green,
+                                          foregroundColor:
+                                          Colors.white,
+                                        ),
+                                        child: const Text('Approve'),
                                       ),
+                                    ),
 
-                                      child: const Text('Approve'),
+                                    const SizedBox(width: 12),
+
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          updateEventStatus(
+                                            context,
+                                            eventId,
+                                            'rejected',
+                                          );
+                                        },
+                                        style:
+                                        ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor:
+                                          Colors.white,
+                                        ),
+                                        child: const Text('Reject'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              const SizedBox(height: 10),
+
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    deleteEvent(
+                                      context,
+                                      eventId,
+                                      title,
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                  ),
+                                  label: const Text(
+                                    'Delete Event',
+                                    style: TextStyle(
+                                      color: Colors.red,
                                     ),
                                   ),
-
-                                  const SizedBox(width: 12),
-
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        updateEventStatus(
-                                          context,
-                                          eventId,
-                                          'rejected',
-                                        );
-                                      },
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                        Colors.red,
-                                        foregroundColor:
-                                        Colors.white,
-                                      ),
-
-                                      child: const Text('Reject'),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),

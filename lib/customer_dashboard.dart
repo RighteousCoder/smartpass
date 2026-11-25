@@ -1,4 +1,4 @@
-
+import 'customer_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'event_details_screen.dart';
@@ -309,6 +309,13 @@ class CustomerDashboard extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const MyTicketsScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CustomerProfileScreen(),
               ),
             );
           }
